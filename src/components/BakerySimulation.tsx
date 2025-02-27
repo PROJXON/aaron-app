@@ -1,6 +1,5 @@
 "use client";
-import React, { useState, useEffect } from 'react';
-import { v4 as uuidv4 } from 'uuid';
+import React, { useState, useEffect, useCallback } from 'react';
 
 interface Batch {
   id: number;
@@ -57,7 +56,7 @@ const BakerySimulation: React.FC = () => {
   }, [isRunning, speed]);
 
   // Add initial batches
-  const addInitialBatches = () => {
+  const addInitialBatches = useCallback(() => {
     // Reset simulation
     setTime(0);
     setLogs([]);
@@ -90,7 +89,7 @@ const BakerySimulation: React.FC = () => {
     setMixerQueue(initialBatches);
     setNextBatchId(nextBatchId + 6);
     addLog(0, "Simulation started with 6 batches");
-  };
+  }, [nextBatchId]);
 
   // Add a log entry
   const addLog = (time: number, message: string) => {
@@ -98,14 +97,14 @@ const BakerySimulation: React.FC = () => {
   };
 
   // Show animation of cookies moving between stations
-  const showTransferAnimation = (from: string, to: string, batch: Batch) => {
+  const showTransferAnimation = useCallback((from: string, to: string, batch: Batch) => {
     setTransferAnimation({ from, to, batch, startTime: time });
     
     // Clear animation after 2 seconds
     setTimeout(() => {
       setTransferAnimation(null);
     }, 2000 / speed);
-  };
+  }, [time, speed]);
 
   // Process simulation step
   useEffect(() => {
@@ -159,6 +158,16 @@ const BakerySimulation: React.FC = () => {
         batch.status = 'mixed';
         setMixerBusy(false); // Reset mixer
         addLog(time, `Batch #${batch.id} (${batch.size} cookies) finished mixing`);
+
+        // Move batch to ovenQueue automatically
+        showTransferAnimation('mixer', 'oven', batch);
+        setTimeout(() => {
+          setMixerQueue(prev => prev.slice(1));
+          batch.bakeStartTime = time;
+          batch.status = 'baking';
+          setOvenQueue(prev => [...prev, batch]);
+          addLog(time, `Batch #${batch.id} (${batch.size} cookies) moved from mixer to oven`);
+        }, 1000 / speed);
       }
     }
   
@@ -169,6 +178,16 @@ const BakerySimulation: React.FC = () => {
         batch.status = 'baked';
         setOvenBusy(false); // Reset oven
         addLog(time, `Batch #${batch.id} (${batch.size} cookies) finished baking`);
+
+        // Move batch to packerQueue automatically
+        showTransferAnimation('oven', 'packer', batch);
+        setTimeout(() => {
+          setOvenQueue(prev => prev.slice(1));
+          batch.packStartTime = time;
+          batch.status = 'packing';
+          setPackerQueue(prev => [...prev, batch]);
+          addLog(time, `Batch #${batch.id} (${batch.size} cookies) moved from oven to packer`);
+        }, 1000 / speed);
       }
     }
   
@@ -202,7 +221,16 @@ const BakerySimulation: React.FC = () => {
       addLog(time, "All batches completed! Simulation finished.");
     }
   
-  }, [time, isRunning, mixerQueue, ovenQueue, packerQueue, mixerBusy, ovenBusy, packerBusy]);
+    // Ensure mixer starts after oven is done
+    if (!mixerBusy && mixerQueue.length > 0 && mixerQueue[0].status === 'waiting') {
+      const batch: Batch = mixerQueue[0];
+      setMixerBusy(true);
+      batch.mixStartTime = time;
+      batch.status = 'mixing';
+      addLog(time, `Batch #${batch.id} (${batch.size} cookies) started mixing`);
+    }
+  
+  }, [time, isRunning, mixerQueue, ovenQueue, packerQueue, mixerBusy, ovenBusy, packerBusy, addInitialBatches, showTransferAnimation, speed]);
   
   
 
@@ -232,7 +260,6 @@ const BakerySimulation: React.FC = () => {
 
   // Batch visualization with cookies
   const BatchVisual: React.FC<{ batch: Batch, status?: string }> = ({ batch, status }) => {
-    const small = batch.size === 50;
     return (
       <div className={`relative w-full h-12 rounded flex items-center justify-center ${getStatusColor(status || batch.status)}`}>
         <div className="absolute top-1 left-1 text-xs font-bold">#{batch.id}</div>
