@@ -1,11 +1,13 @@
-import type { NextConfig } from 'next';
+import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  output: 'export',
-  distDir: 'out', // Ensure output is placed in 'out' for GitHub Pages
+  output: "export",  // Enables static export (replaces `next export`)
+  distDir: "out",    // Ensures build output goes to the correct folder
   images: {
-    unoptimized: true, // GitHub Pages does not support Next.js image optimization
+    unoptimized: true,  // Since GitHub Pages doesn't support image optimization
   },
+  basePath: "/aaron-app",  // Change this to match your GitHub repo name
+  trailingSlash: true,  // Ensures proper routing on GitHub Pages
 };
 
 export default nextConfig;
