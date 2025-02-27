@@ -1,8 +1,4 @@
-
-
-## Getting Started
-
-First, run the development server:
+Open Terminal
 
 ```npm install next@latest```
 
