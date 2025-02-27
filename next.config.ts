@@ -8,7 +8,6 @@ const nextConfig: NextConfig = {
   },
   basePath: "/aaron-app",  // Change this to match your GitHub repo name
   trailingSlash: true,  // Ensures proper routing on GitHub Pages
-  assetPrefix: "/aaron-app/"
 };
 
 export default nextConfig;
