@@ -7,10 +7,12 @@ First, run the development server:
 ```bash
 npm install next@latest```
 
-```
+run
+```bash
 npm run dev
 ```
 
 go to 
 
-```localhost:3000```
+```bash
+localhost:3000```
