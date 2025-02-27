@@ -1,20 +1,44 @@
 "use client";
 import React, { useState, useEffect } from 'react';
+import { v4 as uuidv4 } from 'uuid';
 
-const BakerySimulation = () => {
-  const [time, setTime] = useState(0);
-  const [isRunning, setIsRunning] = useState(false);
-  const [speed, setSpeed] = useState(1);
-  const [logs, setLogs] = useState([]);
-  const [mixerQueue, setMixerQueue] = useState([]);
-  const [ovenQueue, setOvenQueue] = useState([]);
-  const [packerQueue, setPackerQueue] = useState([]);
-  const [mixerBusy, setMixerBusy] = useState(false);
-  const [ovenBusy, setOvenBusy] = useState(false);
-  const [packerBusy, setPackerBusy] = useState(false);
-  const [completedBatches, setCompletedBatches] = useState([]);
-  const [nextBatchId, setNextBatchId] = useState(1);
-  const [transferAnimation, setTransferAnimation] = useState(null);
+interface Batch {
+  id: number;
+  size: number;
+  status: string;
+  arrivalTime: number;
+  mixStartTime?: number;
+  bakeStartTime?: number;
+  packStartTime?: number;
+  completionTime?: number;
+}
+
+interface Log {
+  time: number;
+  message: string;
+}
+
+interface TransferAnimation {
+  from: string;
+  to: string;
+  batch: Batch;
+  startTime: number;
+}
+
+const BakerySimulation: React.FC = () => {
+  const [time, setTime] = useState<number>(0);
+  const [isRunning, setIsRunning] = useState<boolean>(false);
+  const [speed, setSpeed] = useState<number>(1);
+  const [logs, setLogs] = useState<Log[]>([]);
+  const [mixerQueue, setMixerQueue] = useState<Batch[]>([]);
+  const [ovenQueue, setOvenQueue] = useState<Batch[]>([]);
+  const [packerQueue, setPackerQueue] = useState<Batch[]>([]);
+  const [mixerBusy, setMixerBusy] = useState<boolean>(false);
+  const [ovenBusy, setOvenBusy] = useState<boolean>(false);
+  const [packerBusy, setPackerBusy] = useState<boolean>(false);
+  const [completedBatches, setCompletedBatches] = useState<Batch[]>([]);
+  const [nextBatchId, setNextBatchId] = useState<number>(1);
+  const [transferAnimation, setTransferAnimation] = useState<TransferAnimation | null>(null);
 
   // Define process times
   const mixTime = 10;
@@ -48,7 +72,7 @@ const BakerySimulation = () => {
     setTransferAnimation(null);
     
     // Add 6 batches (3 iterations of small and large)
-    const initialBatches = [];
+    const initialBatches: Batch[] = [];
     for (let i = 0; i < 3; i++) {
       initialBatches.push({
         id: nextBatchId + (i * 2),
@@ -69,12 +93,12 @@ const BakerySimulation = () => {
   };
 
   // Add a log entry
-  const addLog = (time, message) => {
+  const addLog = (time: number, message: string) => {
     setLogs(prevLogs => [...prevLogs, { time, message }]);
   };
 
   // Show animation of cookies moving between stations
-  const showTransferAnimation = (from, to, batch) => {
+  const showTransferAnimation = (from: string, to: string, batch: Batch) => {
     setTransferAnimation({ from, to, batch, startTime: time });
     
     // Clear animation after 2 seconds
@@ -86,30 +110,30 @@ const BakerySimulation = () => {
   // Process simulation step
   useEffect(() => {
     if (!isRunning) return;
-
-    // Process packer
+  
+    // Process packing (from oven)
     if (!packerBusy && ovenQueue.length > 0 && ovenQueue[0].status === 'baked') {
-      const batch = ovenQueue[0];
-      // Show animation before updating state
+      const batch: Batch = ovenQueue[0];
       showTransferAnimation('oven', 'packer', batch);
       
       setTimeout(() => {
+        // Move batch to packing
         setOvenQueue(prev => prev.slice(1));
         setPackerBusy(true);
         batch.packStartTime = time;
         batch.status = 'packing';
-        setPackerQueue([batch]);
+        setPackerQueue(prev => [...prev, batch]);
         addLog(time, `Batch #${batch.id} (${batch.size} cookies) moved from oven to packing`);
       }, 1000 / speed);
     }
-
-    // Process oven
+  
+    // Process oven (from mixer)
     if (!ovenBusy && mixerQueue.length > 0 && mixerQueue[0].status === 'mixed') {
-      const batch = mixerQueue[0];
-      // Show animation before updating state
+      const batch: Batch = mixerQueue[0];
       showTransferAnimation('mixer', 'oven', batch);
-      
+  
       setTimeout(() => {
+        // Move batch to oven
         setMixerQueue(prev => prev.slice(1));
         setOvenBusy(true);
         batch.bakeStartTime = time;
@@ -118,63 +142,72 @@ const BakerySimulation = () => {
         addLog(time, `Batch #${batch.id} (${batch.size} cookies) moved from mixer to oven`);
       }, 1000 / speed);
     }
-
-    // Process mixer
+  
+    // Process mixer (from waiting to mixing)
     if (!mixerBusy && mixerQueue.length > 0 && mixerQueue[0].status === 'waiting') {
-      const batch = mixerQueue[0];
+      const batch: Batch = mixerQueue[0];
       setMixerBusy(true);
       batch.mixStartTime = time;
       batch.status = 'mixing';
       addLog(time, `Batch #${batch.id} (${batch.size} cookies) started mixing`);
     }
-
+  
     // Check for completed mixing
     if (mixerBusy && mixerQueue.length > 0 && mixerQueue[0].status === 'mixing') {
-      const batch = mixerQueue[0];
-      if (time - batch.mixStartTime >= mixTime) {
+      const batch: Batch = mixerQueue[0];
+      if (batch.mixStartTime !== undefined && time - batch.mixStartTime >= mixTime) {
         batch.status = 'mixed';
-        setMixerBusy(false);
+        setMixerBusy(false); // Reset mixer
         addLog(time, `Batch #${batch.id} (${batch.size} cookies) finished mixing`);
       }
     }
-
+  
     // Check for completed baking
     if (ovenBusy && ovenQueue.length > 0 && ovenQueue[0].status === 'baking') {
-      const batch = ovenQueue[0];
-      if (time - batch.bakeStartTime >= bakeTime) {
+      const batch: Batch = ovenQueue[0];
+      if (batch.bakeStartTime !== undefined && time - batch.bakeStartTime >= bakeTime) {
         batch.status = 'baked';
-        setOvenBusy(false);
+        setOvenBusy(false); // Reset oven
         addLog(time, `Batch #${batch.id} (${batch.size} cookies) finished baking`);
       }
     }
-
+  
     // Check for completed packing
     if (packerBusy && packerQueue.length > 0) {
-      const batch = packerQueue[0];
-      if (time - batch.packStartTime >= packTime) {
+      const batch: Batch = packerQueue[0];
+      if (batch.packStartTime !== undefined && time - batch.packStartTime >= packTime) {
         batch.status = 'completed';
         batch.completionTime = time;
-        setPackerBusy(false);
-        setPackerQueue([]);
+        setPackerBusy(false); // Reset packer
+        setPackerQueue([]); // Clear packing queue
         showTransferAnimation('packer', 'completed', batch);
-        
+  
         setTimeout(() => {
-          setCompletedBatches(prev => [...prev, batch]);
+          setCompletedBatches(prev => [...prev, batch]); // Add to completed batches
           addLog(time, `Batch #${batch.id} (${batch.size} cookies) completed and ready for shipping!`);
-          
-          // Check if all batches are completed
-          if (mixerQueue.length === 0 && ovenQueue.length === 0 && packerQueue.length === 0 && 
-              !mixerBusy && !ovenBusy && !packerBusy) {
-            setIsRunning(false);
-            addLog(time, "All batches completed! Simulation finished.");
-          }
         }, 1000 / speed);
       }
     }
-  }, [time, isRunning]);
+  
+    // Process subsequent batches (to keep the flow moving)
+    if (mixerQueue.length === 0 && !mixerBusy && ovenQueue.length === 0 && !ovenBusy && packerQueue.length === 0 && !packerBusy) {
+      // Reset and start processing the next batch
+      addInitialBatches();
+    }
+  
+    // Check if all batches are completed
+    if (mixerQueue.length === 0 && ovenQueue.length === 0 && packerQueue.length === 0 &&
+        !mixerBusy && !ovenBusy && !packerBusy) {
+      setIsRunning(false);
+      addLog(time, "All batches completed! Simulation finished.");
+    }
+  
+  }, [time, isRunning, mixerQueue, ovenQueue, packerQueue, mixerBusy, ovenBusy, packerBusy]);
+  
+  
 
   // Get status color
-  const getStatusColor = (status) => {
+  const getStatusColor = (status: string) => {
     switch(status) {
       case 'waiting': return 'bg-gray-200';
       case 'mixing': return 'bg-blue-400';
@@ -188,7 +221,7 @@ const BakerySimulation = () => {
   };
 
   // Cookie icon (simplified)
-  const CookieIcon = ({ size = "small" }) => {
+  const CookieIcon: React.FC<{ size?: string }> = ({ size = "small" }) => {
     const dimensions = size === "small" ? "w-3 h-3" : "w-6 h-6";
     return (
       <div className={`${dimensions} rounded-full bg-yellow-600 relative flex items-center justify-center`}>
@@ -198,17 +231,17 @@ const BakerySimulation = () => {
   };
 
   // Batch visualization with cookies
-  const BatchVisual = ({ batch, status }) => {
+  const BatchVisual: React.FC<{ batch: Batch, status?: string }> = ({ batch, status }) => {
     const small = batch.size === 50;
     return (
       <div className={`relative w-full h-12 rounded flex items-center justify-center ${getStatusColor(status || batch.status)}`}>
         <div className="absolute top-1 left-1 text-xs font-bold">#{batch.id}</div>
         <div className="flex items-center">
-          <div className="flex">
-            {[...Array(small ? 3 : 5)].map((_, i) => (
-              <CookieIcon key={i} />
+            <div className="flex">
+            {[...Array(3)].map((_, i) => (
+                <CookieIcon key={`${batch.id}-${batch.arrivalTime}-${i}`} />
             ))}
-          </div>
+            </div>
           <span className="ml-2 font-bold">{batch.size}</span>
         </div>
       </div>
@@ -216,7 +249,7 @@ const BakerySimulation = () => {
   };
 
   // Progress bar for stations
-  const ProgressBar = ({ current, total, status }) => {
+  const ProgressBar: React.FC<{ current: number, total: number, status: string }> = ({ current, total, status }) => {
     const percent = Math.min((current / total) * 100, 100);
     let color;
     switch(status) {
@@ -237,38 +270,40 @@ const BakerySimulation = () => {
   };
 
   // Transfer animation component
-  const TransferAnimationComponent = () => {
+  const TransferAnimationComponent: React.FC = () => {
     if (!transferAnimation) return null;
-    
+  
     const { from, to, batch } = transferAnimation;
-    
-    let className = "fixed z-10 animate-pulse";
-    let style = {};
-    
-    // Position based on from/to
-    if (from === 'mixer' && to === 'oven') {
-      className += " top-1/4 left-1/3 animate-bounce";
-    } else if (from === 'oven' && to === 'packer') {
-      className += " top-1/4 left-2/3 animate-bounce";
-    } else if (from === 'packer' && to === 'completed') {
-      className += " top-1/2 left-2/3 animate-bounce";
-    }
-    
+  
+    const getClassName = () => {
+      let className = "fixed z-10 animate-pulse";
+  
+      // Position based on from/to
+      if (from === 'mixer' && to === 'oven') {
+        className += " top-1/4 left-1/3 animate-bounce";
+      } else if (from === 'oven' && to === 'packer') {
+        className += " top-1/4 left-2/3 animate-bounce";
+      } else if (from === 'packer' && to === 'completed') {
+        className += " top-1/2 left-2/3 animate-bounce";
+      }
+  
+      return className;
+    };
+  
     return (
-      <div className={className} style={style}>
+      <div className={getClassName()} style={{ width: '100%' }}>
         <div className="bg-white p-2 rounded shadow-lg">
           <div className="text-xs font-bold">Moving Batch #{batch.id}</div>
           <div className="flex items-center justify-center my-1">
             {[...Array(3)].map((_, i) => (
-              <CookieIcon key={i} size="large" />
+                <CookieIcon key={`${batch.id}-${batch.arrivalTime}-${i}`} />
             ))}
-          </div>
+            </div>
           <div className="text-xs text-center">From {from} to {to}</div>
         </div>
       </div>
     );
   };
-
   return (
     <div className="p-4 max-w-4xl mx-auto">
       <h1 className="text-2xl font-bold mb-4">Bakery Production Simulation</h1>
@@ -407,7 +442,7 @@ const BakerySimulation = () => {
               <>
                 <BatchVisual batch={mixerQueue[0]} status="mixing" />
                 <ProgressBar 
-                  current={time - mixerQueue[0].mixStartTime} 
+                  current={time - (mixerQueue[0]?.mixStartTime ?? 0)} 
                   total={mixTime} 
                   status="mixing" 
                 />
@@ -417,8 +452,8 @@ const BakerySimulation = () => {
           
           <h3 className="font-bold mt-4">Queue:</h3>
           <div className="max-h-32 overflow-y-auto">
-            {mixerQueue.filter((_, i) => i > 0 || !mixerBusy).map(batch => (
-              <div key={batch.id} className="my-1">
+            {mixerQueue.filter((_, i) => i > 0 || !mixerBusy).map((batch, index) => (
+              <div key={`${batch.id}-${index}`} className="my-1">
                 <BatchVisual batch={batch} />
               </div>
             ))}
@@ -439,7 +474,7 @@ const BakerySimulation = () => {
               <>
                 <BatchVisual batch={ovenQueue[0]} status="baking" />
                 <ProgressBar 
-                  current={time - ovenQueue[0].bakeStartTime} 
+                  current={time - (ovenQueue[0]?.bakeStartTime ?? 0)}
                   total={bakeTime} 
                   status="baking" 
                 />
@@ -449,8 +484,8 @@ const BakerySimulation = () => {
           
           <h3 className="font-bold mt-4">Queue:</h3>
           <div className="max-h-32 overflow-y-auto">
-            {ovenQueue.filter((batch, i) => !(i === 0 && batch.status === 'baking')).map(batch => (
-              <div key={batch.id} className="my-1">
+            {ovenQueue.filter((_, i) => i > 0 || !mixerBusy).map((batch, index) => (
+              <div key={`${batch.id}-${index}`} className="my-1">
                 <BatchVisual batch={batch} />
               </div>
             ))}
@@ -471,7 +506,7 @@ const BakerySimulation = () => {
               <>
                 <BatchVisual batch={packerQueue[0]} status="packing" />
                 <ProgressBar 
-                  current={time - packerQueue[0].packStartTime} 
+                  current={time - (packerQueue[0]?.packStartTime ?? 0)}
                   total={packTime} 
                   status="packing" 
                 />
@@ -481,19 +516,19 @@ const BakerySimulation = () => {
           
           <h3 className="font-bold mt-4">Completed & Shipped:</h3>
           <div className="max-h-32 overflow-y-auto">
-            {completedBatches.map(batch => (
-              <div key={batch.id} className="my-1">
+          {completedBatches.map((batch, index) => (
+            <div key={`${batch.id}-${index}`} className="my-1">
                 <div className={`w-full p-2 rounded flex justify-between items-center ${getStatusColor('completed')}`}>
-                  <div className="flex items-center">
+                <div className="flex items-center">
                     <div className="flex">
-                      <CookieIcon />
-                      <CookieIcon />
+                    <CookieIcon key={`${batch.id}-${index}-1`} />
+                    <CookieIcon key={`${batch.id}-${index}-2`} />
                     </div>
                     <span className="ml-1">#{batch.id} ({batch.size})</span>
-                  </div>
-                  <span className="text-xs">Completed: {batch.completionTime}m</span>
                 </div>
-              </div>
+                <span className="text-xs">Completed: {batch.completionTime}m</span>
+                </div>
+            </div>
             ))}
             {completedBatches.length === 0 && (
               <div className="text-gray-500 italic">No completed batches yet</div>
