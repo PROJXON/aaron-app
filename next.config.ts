@@ -1,8 +1,11 @@
-import { NextConfig } from 'next';
+import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   output: 'export',
-  // ...other valid configuration settings...
+  distDir: 'out', // Ensure output is placed in 'out' for GitHub Pages
+  images: {
+    unoptimized: true, // GitHub Pages does not support Next.js image optimization
+  },
 };
 
 export default nextConfig;
