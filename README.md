@@ -4,14 +4,13 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 First, run the development server:
 
-```bash
-npm install next@latest```
+```bash npm install next@latest```
 
 run
 
-```npm run dev```
+```bash npm run dev```
 
 
 go to 
 
-```localhost:3000```
+```bash localhost:3000```
