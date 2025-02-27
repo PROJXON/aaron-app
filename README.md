@@ -9,8 +9,7 @@ npm install next@latest```
 
 run
 ```bash
-npm run dev
-```
+npm run dev```
 
 go to 
 
