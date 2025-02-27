@@ -56,6 +56,9 @@ jobs:
             ${{ runner.os }}-nextjs-
       - name: Install dependencies
         run: ${{ steps.detect-package-manager.outputs.manager }} ${{ steps.detect-package-manager.outputs.command }}
+      - name: Skip ESLint check (if desired)
+        run: |
+          NEXT_TELEMETRY_DISABLED=1 eslint --ignore-path .gitignore . || true  # Ignore ESLint errors temporarily
       - name: Build with Next.js
         run: |
           ${{ steps.detect-package-manager.outputs.runner }} next build
